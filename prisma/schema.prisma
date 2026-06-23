@@ -7,17 +7,75 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum Role             { STUDENT TEACHER ADMIN }
-enum Level            { BEGINNER INTERMEDIATE ADVANCED }
-enum SessionType      { ONE_ON_ONE GROUP }
-enum SessionStatus    { SCHEDULED ONGOING COMPLETED CANCELLED }
-enum AttendanceStatus { PRESENT LATE ABSENT }
-enum AssignmentType   { PRACTICE PERFORMANCE THEORY }
-enum SubmissionStatus { SUBMITTED GRADED REVISION_REQUESTED }
-enum RecordingType    { PRACTICE ASSIGNMENT REFERENCE LIVE_CLASS }
-enum ResourceType     { PDF AUDIO VIDEO LINK }
-enum EnrollmentStatus { ACTIVE PAUSED COMPLETED CANCELLED }
-enum PaymentStatus    { PENDING COMPLETED REFUNDED FAILED }
+enum Role {
+  STUDENT
+  TEACHER
+  ADMIN
+}
+
+enum Level {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+enum SessionType {
+  ONE_ON_ONE
+  GROUP
+}
+
+enum SessionStatus {
+  SCHEDULED
+  ONGOING
+  COMPLETED
+  CANCELLED
+}
+
+enum AttendanceStatus {
+  PRESENT
+  LATE
+  ABSENT
+}
+
+enum AssignmentType {
+  PRACTICE
+  PERFORMANCE
+  THEORY
+}
+
+enum SubmissionStatus {
+  SUBMITTED
+  GRADED
+  REVISION_REQUESTED
+}
+
+enum RecordingType {
+  PRACTICE
+  ASSIGNMENT
+  REFERENCE
+  LIVE_CLASS
+}
+
+enum ResourceType {
+  PDF
+  AUDIO
+  VIDEO
+  LINK
+}
+
+enum EnrollmentStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  REFUNDED
+  FAILED
+}
 
 model User {
   id        String   @id @default(cuid())
