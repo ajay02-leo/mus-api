@@ -11,6 +11,7 @@ enum Role {
   STUDENT
   TEACHER
   ADMIN
+  CONTENT_MANAGER
 }
 
 enum Level {
@@ -70,6 +71,12 @@ enum EnrollmentStatus {
   CANCELLED
 }
 
+enum CourseStatus {
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+}
+
 enum PaymentStatus {
   PENDING
   COMPLETED
@@ -77,18 +84,34 @@ enum PaymentStatus {
   FAILED
 }
 
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum EventType {
+  CONCERT
+  WORKSHOP
+  MASTERCLASS
+  SHOWCASE
+}
+
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
+  id        String     @id @default(cuid())
+  email     String     @unique
   password  String
-  role      Role     @default(STUDENT)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  role      Role       @default(STUDENT)
+  status    UserStatus @default(ACTIVE)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
 
   student       StudentProfile?
   teacher       TeacherProfile?
   notifications Notification[]
   recordings    Recording[]
+  settings      UserSettings?
+  posts         Post[]
+  comments      Comment[]
 
   @@map("users")
 }
@@ -135,18 +158,19 @@ model TeacherProfile {
 }
 
 model Course {
-  id          String  @id @default(cuid())
+  id          String       @id @default(cuid())
   teacherId   String
   teacher     TeacherProfile @relation(fields: [teacherId], references: [id])
   title       String
   description String?
-  level       Level   @default(BEGINNER)
+  level       Level        @default(BEGINNER)
   ragas       String[]
-  price       Float   @default(0)
-  isPublished Boolean @default(false)
+  price       Float        @default(0)
+  isPublished Boolean      @default(false)
+  status      CourseStatus @default(PENDING_REVIEW)
   thumbnail   String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 
   enrollments  Enrollment[]
   sessions     Session[]
@@ -163,6 +187,8 @@ model Enrollment {
   course     Course           @relation(fields: [courseId], references: [id])
   enrolledAt DateTime         @default(now())
   status     EnrollmentStatus @default(ACTIVE)
+  paymentRef String?
+  paidAmount Float            @default(0)
 
   @@unique([studentId, courseId])
   @@map("enrollments")
@@ -294,4 +320,86 @@ model Notification {
   createdAt DateTime @default(now())
 
   @@map("notifications")
+}
+
+model UserSettings {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notifAssignments   Boolean  @default(true)
+  notifSessions      Boolean  @default(true)
+  notifReminders     Boolean  @default(true)
+  notifMarketing     Boolean  @default(false)
+  notifNewStudents   Boolean  @default(true)
+  notifSubmissions   Boolean  @default(true)
+  notifPayments      Boolean  @default(true)
+  autoAcceptEnroll   Boolean  @default(false)
+  profileVisibility  String   @default("students")
+  progressVisibility String   @default("teacher")
+  updatedAt          DateTime @updatedAt
+
+  @@map("user_settings")
+}
+
+model Event {
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  type        EventType @default(CONCERT)
+  artists     String[]
+  date        DateTime
+  time        String
+  venue       String
+  seats       Int       @default(100)
+  booked      Int       @default(0)
+  price       Float     @default(0)
+  tags        String[]
+  isPublished Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+
+  registrations EventRegistration[]
+
+  @@map("events")
+}
+
+model EventRegistration {
+  id        String   @id @default(cuid())
+  eventId   String
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  userId    String
+  createdAt DateTime @default(now())
+
+  @@unique([eventId, userId])
+  @@map("event_registrations")
+}
+
+model Post {
+  id           String   @id @default(cuid())
+  authorId     String
+  author       User     @relation(fields: [authorId], references: [id])
+  category     String
+  title        String
+  body         String
+  tags         String[]
+  pinned       Boolean  @default(false)
+  likedBy      String[]
+  bookmarkedBy String[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  comments Comment[]
+
+  @@map("posts")
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id])
+  body      String
+  createdAt DateTime @default(now())
+
+  @@map("comments")
 }

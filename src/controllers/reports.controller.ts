@@ -25,7 +25,8 @@ export async function monthlyReport(req: AuthRequest, res: Response) {
             select: { score: true, status: true },
           },
           attendance: {
-            include: { session: { where: { scheduledAt: { gte: start, lte: end } } } },
+            where: { session: { scheduledAt: { gte: start, lte: end } } },
+            select: { status: true },
           },
         },
       },

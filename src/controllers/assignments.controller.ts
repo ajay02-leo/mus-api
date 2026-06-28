@@ -86,3 +86,27 @@ export async function gradeSubmission(req: AuthRequest, res: Response) {
   })
   return res.json({ success: true, submission })
 }
+
+export async function reviewQueue(req: AuthRequest, res: Response) {
+  const teacher = await prisma.teacherProfile.findUnique({ where: { userId: req.user!.userId } })
+  if (!teacher) return res.status(404).json({ success: false, message: 'Teacher not found' })
+
+  const submissions = await prisma.assignmentSubmission.findMany({
+    where: {
+      status: 'SUBMITTED',
+      assignment: { teacherId: teacher.id },
+    },
+    include: {
+      assignment: { select: { id: true, title: true, type: true, raga: true } },
+      student: {
+        select: {
+          displayName: true,
+          user: { select: { email: true } },
+        },
+      },
+    },
+    orderBy: { submittedAt: 'desc' },
+  })
+
+  return res.json({ success: true, submissions })
+}

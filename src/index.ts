@@ -68,8 +68,21 @@ Most endpoints require a **JWT bearer token**. Obtain one via \`POST /api/auth/l
 
 // ─── Core middleware ──────────────────────────────────────────────────────────
 
+const ALLOWED_ORIGINS = [
+  process.env.WEB_URL ?? 'http://localhost:3001',
+  'http://localhost:3001',
+]
+
 app.use(cors({
-  origin: process.env.WEB_URL ?? 'http://localhost:3001',
+  origin: (origin, callback) => {
+    // allow requests with no origin (curl, mobile apps, Swagger)
+    if (!origin) return callback(null, true)
+    // allow any LAN IP on port 3001 (phone on same Wi-Fi)
+    if (ALLOWED_ORIGINS.includes(origin) || /^http:\/\/192\.168\.\d+\.\d+:3001$/.test(origin) || /^http:\/\/10\.\d+\.\d+\.\d+:3001$/.test(origin)) {
+      return callback(null, true)
+    }
+    callback(new Error(`CORS: origin ${origin} not allowed`))
+  },
   credentials: true,
 }))
 app.use(cookieParser())
@@ -100,11 +113,20 @@ app.use(errorHandler)
 
 // ─── Start ────────────────────────────────────────────────────────────────────
 
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
+  const { networkInterfaces } = require('os')
+  const nets = networkInterfaces()
+  // Prefer Wi-Fi / Ethernet; skip virtual adapters (VMware, vEthernet, Loopback)
+  const allLan: string[] = (Object.entries(nets) as [string, any[]][])
+    .filter(([name]) => !/vmware|vethernet|loopback|vmnet/i.test(name))
+    .flatMap(([, addrs]) => addrs)
+    .filter((n: any) => n.family === 'IPv4' && !n.internal)
+    .map((n: any) => n.address)
+  const lanIp = allLan[0] ?? 'your-lan-ip'
   console.log(`\n  SwaraSangam API`)
-  console.log(`  ┌───────────────────────────────────────────┐`)
-  console.log(`  │  Server:  http://localhost:${PORT}           │`)
-  console.log(`  │  Swagger: http://localhost:${PORT}/api/docs  │`)
-  console.log(`  │  Health:  http://localhost:${PORT}/health    │`)
-  console.log(`  └───────────────────────────────────────────┘\n`)
+  console.log(`  ┌─────────────────────────────────────────────────┐`)
+  console.log(`  │  Local:   http://localhost:${PORT}                 │`)
+  console.log(`  │  Network: http://${lanIp}:${PORT}           │`)
+  console.log(`  │  Swagger: http://localhost:${PORT}/api/docs        │`)
+  console.log(`  └─────────────────────────────────────────────────┘\n`)
 })

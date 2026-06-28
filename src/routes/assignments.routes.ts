@@ -37,6 +37,7 @@ router.use(authenticate)
  *       201: { description: Assignment created }
  */
 router.get('/', ctrl.listAssignments)
+router.get('/review-queue', requireRole('TEACHER'), ctrl.reviewQueue)
 router.post('/', requireRole('TEACHER'), ctrl.createAssignment)
 
 /**

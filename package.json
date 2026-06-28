@@ -11,9 +11,11 @@
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
     "db:seed": "tsx src/lib/seed.ts",
+    "db:seed:demo": "tsx src/lib/seed_demo.ts",
     "db:studio": "prisma studio"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.105.0",
     "@prisma/client": "^5.16.0",
     "bcryptjs": "^2.4.3",
     "cookie-parser": "^1.4.6",

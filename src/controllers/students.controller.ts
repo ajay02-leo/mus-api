@@ -4,7 +4,7 @@ import { AuthRequest } from '../middleware/auth'
 
 export async function listStudents(req: AuthRequest, res: Response) {
   const teacher = await prisma.teacherProfile.findUnique({ where: { userId: req.user!.userId } })
-  if (!teacher) return res.status(404).json({ success: false, message: 'Teacher profile not found' })
+  if (!teacher) return res.json({ success: true, students: [], page: 1, total: 0 })
 
   const page = Number(req.query.page ?? 1)
   const limit = Number(req.query.limit ?? 20)
@@ -14,6 +14,7 @@ export async function listStudents(req: AuthRequest, res: Response) {
     include: {
       student: {
         include: {
+          user: { select: { email: true } },
           submissions: { select: { score: true, status: true } },
           attendance: { select: { status: true } },
         },
@@ -25,9 +26,31 @@ export async function listStudents(req: AuthRequest, res: Response) {
     orderBy: { enrolledAt: 'desc' },
   })
 
+  const LEVEL_NUM: Record<string, number> = { BEGINNER: 1, INTERMEDIATE: 3, ADVANCED: 4 }
+
   return res.json({
     success: true,
-    students: enrollments.map(e => ({ ...e.student, course: e.course, enrolledAt: e.enrolledAt })),
+    students: enrollments.map(e => {
+      const s = e.student
+      const graded = s.submissions.filter(sub => sub.status === 'GRADED' && sub.score != null)
+      const avgScore = graded.length > 0
+        ? Math.round(graded.reduce((a, sub) => a + (sub.score ?? 0), 0) / graded.length)
+        : null
+      return {
+        id: s.id,
+        name: s.displayName,
+        email: s.user.email,
+        level: LEVEL_NUM[s.level] ?? 1,
+        levelLabel: s.level,
+        xp: s.xp,
+        streak: s.streak,
+        totalSessions: s.attendance.length,
+        presentSessions: s.attendance.filter(a => a.status === 'PRESENT').length,
+        avgScore,
+        course: e.course,
+        enrolledAt: e.enrolledAt,
+      }
+    }),
     page,
     total: enrollments.length,
   })
@@ -56,7 +79,9 @@ export async function myStats(req: AuthRequest, res: Response) {
       enrollments: { select: { status: true, course: { select: { title: true } } } },
     },
   })
-  if (!student) return res.status(404).json({ success: false, message: 'Student profile not found' })
+  if (!student) {
+    return res.json({ success: true, student: { xp: 0, streak: 0, level: 'BEGINNER', submissions: [], attendance: [], enrollments: [] }, avgScore: null, attendancePct: null, totalAssignments: 0 })
+  }
 
   const graded = student.submissions.filter(s => s.status === 'GRADED' && s.score != null)
   const avgScore = graded.length > 0
@@ -71,9 +96,18 @@ export async function myStats(req: AuthRequest, res: Response) {
 }
 
 export async function updateMyProfile(req: AuthRequest, res: Response) {
-  const profile = await prisma.studentProfile.update({
+  const { displayName, bio, avatar, level, ragas } = req.body
+  const data: any = {}
+  if (displayName !== undefined) data.displayName = displayName
+  if (bio !== undefined) data.bio = bio
+  if (avatar !== undefined) data.avatar = avatar
+  if (level !== undefined) data.level = level
+  if (ragas !== undefined) data.ragas = ragas
+
+  const profile = await prisma.studentProfile.upsert({
     where: { userId: req.user!.userId },
-    data: req.body,
+    update: data,
+    create: { userId: req.user!.userId, displayName: displayName ?? 'Student', ...data },
   })
   return res.json({ success: true, profile })
 }

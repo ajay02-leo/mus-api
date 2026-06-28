@@ -34,8 +34,8 @@ router.use(authenticate)
  *     responses:
  *       201: { description: Resource created }
  */
-router.get('/', (req, res) =>
-  req.user?.role === 'TEACHER' ? ctrl.listResources(req as any, res) : ctrl.myResources(req as any, res),
+router.get('/', (req: any, res) =>
+  req.user?.role === 'TEACHER' ? ctrl.listResources(req, res) : ctrl.myResources(req, res),
 )
 router.post('/', requireRole('TEACHER'), ctrl.createResource)
 
