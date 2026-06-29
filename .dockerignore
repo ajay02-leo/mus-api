@@ -1,0 +1,8 @@
+node_modules
+dist
+uploads
+.env
+*.log
+seed_*.txt
+tests
+jest.config.js

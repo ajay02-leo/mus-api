@@ -17,6 +17,9 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 
+RUN addgroup --system --gid 1001 apigroup && \
+    adduser --system --uid 1001 apiuser
+
 COPY package*.json ./
 RUN npm ci --omit=dev
 
@@ -24,6 +27,10 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY prisma ./prisma
 
+# Create uploads directory and set ownership
+RUN mkdir -p uploads/recordings && chown -R apiuser:apigroup uploads
+
+USER apiuser
 EXPOSE 4000
 
 CMD ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]
