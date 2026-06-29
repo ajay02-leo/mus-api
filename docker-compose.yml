@@ -1,0 +1,84 @@
+version: '3.9'
+
+# Run from the api/ directory:
+#   docker compose up --build
+#
+# For Raspberry Pi (ARM64):
+#   docker buildx build --platform linux/arm64 -t swara-api .
+#   docker buildx build --platform linux/arm64 -t swara-web ../web
+#
+# Set API URL for production (your Pi/server IP):
+#   NEXT_PUBLIC_API_URL=http://192.168.1.x:4000 docker compose up --build
+
+services:
+  # ── PostgreSQL ──────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    container_name: swara_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: swara_sangam
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - '5432:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Express API ─────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: swara_api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/swara_sangam
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      JWT_EXPIRES_IN: 7d
+      NODE_ENV: production
+      PORT: 4000
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3001}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    volumes:
+      - api_uploads:/app/uploads
+    ports:
+      - '4000:4000'
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://localhost:4000/api/health || exit 1']
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  # ── Next.js Web ─────────────────────────────────────────
+  web:
+    build:
+      context: ../web
+      dockerfile: Dockerfile
+      args:
+        # Must be the host IP/domain so browsers outside Docker can reach the API
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:4000}
+    container_name: swara_web
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+    ports:
+      - '3001:3001'
+
+volumes:
+  postgres_data:
+    driver: local
+  api_uploads:
+    driver: local
