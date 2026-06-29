@@ -16,6 +16,11 @@ router.get('/courses',                   ctrl.listCourses)
 router.patch('/courses/:id/approve',     ctrl.approveCourse)
 router.patch('/courses/:id/reject',      ctrl.rejectCourse)
 
+// Teacher verification
+router.get('/teachers',                        ctrl.listTeachers)
+router.patch('/teachers/:id/verify',           ctrl.verifyTeacher)
+router.patch('/teachers/:id/unverify',         ctrl.unverifyTeacher)
+
 // Payments
 router.get('/payments',                  ctrl.listPayments)
 

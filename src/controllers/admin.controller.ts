@@ -121,6 +121,48 @@ export async function rejectCourse(req: AuthRequest, res: Response) {
   return res.json({ success: true, course })
 }
 
+export async function listTeachers(req: Request, res: Response) {
+  const { verified, search } = req.query as Record<string, string>
+  const teachers = await prisma.teacherProfile.findMany({
+    where: {
+      ...(verified === 'true' ? { isVerified: true } : verified === 'false' ? { isVerified: false } : {}),
+      ...(search ? { displayName: { contains: search, mode: 'insensitive' } } : {}),
+    },
+    include: {
+      user: { select: { id: true, email: true, status: true, createdAt: true } },
+      _count: { select: { courses: true, sessions: true } },
+    },
+    orderBy: { user: { createdAt: 'desc' } },
+  })
+  return res.json({ success: true, teachers })
+}
+
+export async function verifyTeacher(req: AuthRequest, res: Response) {
+  const teacher = await prisma.teacherProfile.update({
+    where: { id: req.params.id },
+    data: { isVerified: true },
+    include: { user: { select: { email: true } } },
+  })
+  // Notify the teacher
+  await prisma.notification.create({
+    data: {
+      userId: teacher.userId,
+      type: 'VERIFICATION',
+      title: 'Profile Verified!',
+      body: 'Congratulations! Your teacher profile has been verified by the SwaraSangam team. A verified badge is now visible on your profile.',
+    },
+  })
+  return res.json({ success: true, teacher })
+}
+
+export async function unverifyTeacher(req: AuthRequest, res: Response) {
+  const teacher = await prisma.teacherProfile.update({
+    where: { id: req.params.id },
+    data: { isVerified: false },
+  })
+  return res.json({ success: true, teacher })
+}
+
 export async function listPayments(req: AuthRequest, res: Response) {
   const enrollments = await prisma.enrollment.findMany({
     where: { paidAmount: { gt: 0 } },

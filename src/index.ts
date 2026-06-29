@@ -3,6 +3,7 @@ import 'express-async-errors'
 import express from 'express'
 import cors from 'cors'
 import cookieParser from 'cookie-parser'
+import path from 'path'
 import swaggerJsdoc from 'swagger-jsdoc'
 import swaggerUi from 'swagger-ui-express'
 import routes from './routes'
@@ -102,6 +103,12 @@ app.get('/api/docs.json', (_req, res) => res.json(swaggerSpec))
 // ─── Health ───────────────────────────────────────────────────────────────────
 
 app.get('/health', (_req, res) => res.json({ status: 'ok', ts: Date.now() }))
+
+// ─── Static file serving — audio uploads ─────────────────────────────────────
+// Files are served at /uploads/recordings/:filename
+// Only authenticated users should access recordings; for now served openly
+// (add signed-URL middleware here before production)
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')))
 
 // ─── API routes ───────────────────────────────────────────────────────────────
 

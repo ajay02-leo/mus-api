@@ -15,6 +15,7 @@ import teachersRoutes      from './teachers.routes'
 import eventsRoutes        from './events.routes'
 import communityRoutes     from './community.routes'
 import contentRoutes       from './content.routes'
+import recordingsRoutes    from './recordings.routes'
 
 const router = Router()
 
@@ -34,5 +35,6 @@ router.use('/teachers',      teachersRoutes)
 router.use('/events',        eventsRoutes)
 router.use('/community',     communityRoutes)
 router.use('/content',       contentRoutes)
+router.use('/recordings',    recordingsRoutes)
 
 export default router
