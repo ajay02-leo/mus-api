@@ -117,16 +117,19 @@ model User {
 }
 
 model StudentProfile {
-  id          String   @id @default(cuid())
-  userId      String   @unique
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  displayName String
-  avatar      String?
-  bio         String?
-  level       Level    @default(BEGINNER)
-  xp          Int      @default(0)
-  streak      Int      @default(0)
-  ragas       String[]
+  id              String    @id @default(cuid())
+  userId          String    @unique
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  displayName     String
+  avatar          String?
+  bio             String?
+  level           Level     @default(BEGINNER)
+  xp              Int       @default(0)
+  streak          Int       @default(0)
+  ragas           String[]
+  badges          String[]  @default([])
+  lastPracticed   DateTime?
+  totalPracticeMin Int      @default(0)
 
   enrollments  Enrollment[]
   submissions  AssignmentSubmission[]
@@ -282,16 +285,29 @@ model Resource {
 }
 
 model Recording {
-  id        String        @id @default(cuid())
-  userId    String
-  user      User          @relation(fields: [userId], references: [id])
-  url       String
-  duration  Int?
-  type      RecordingType @default(PRACTICE)
-  raga      String?
-  createdAt DateTime      @default(now())
+  id            String        @id @default(cuid())
+  userId        String
+  user          User          @relation(fields: [userId], references: [id])
+  title         String?
+  url           String
+  compressedUrl String?
+  duration      Int?
+  sizeBytes     Int?
+  type          RecordingType @default(PRACTICE)
+  raga          String?
+  createdAt     DateTime      @default(now())
 
   @@map("recordings")
+}
+
+model XpEvent {
+  id        String   @id @default(cuid())
+  userId    String
+  amount    Int
+  reason    String
+  createdAt DateTime @default(now())
+
+  @@map("xp_events")
 }
 
 model Earning {

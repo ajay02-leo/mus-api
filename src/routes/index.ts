@@ -16,6 +16,7 @@ import eventsRoutes        from './events.routes'
 import communityRoutes     from './community.routes'
 import contentRoutes       from './content.routes'
 import recordingsRoutes    from './recordings.routes'
+import gamificationRoutes  from './gamification.routes'
 
 const router = Router()
 
@@ -36,5 +37,6 @@ router.use('/events',        eventsRoutes)
 router.use('/community',     communityRoutes)
 router.use('/content',       contentRoutes)
 router.use('/recordings',    recordingsRoutes)
+router.use('/gamification',  gamificationRoutes)
 
 export default router

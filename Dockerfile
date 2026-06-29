@@ -17,6 +17,9 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 
+# ffmpeg for audio compression
+RUN apk add --no-cache ffmpeg
+
 RUN addgroup --system --gid 1001 apigroup && \
     adduser --system --uid 1001 apiuser
 

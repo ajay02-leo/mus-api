@@ -108,7 +108,14 @@ app.get('/health', (_req, res) => res.json({ status: 'ok', ts: Date.now() }))
 // Files are served at /uploads/recordings/:filename
 // Only authenticated users should access recordings; for now served openly
 // (add signed-URL middleware here before production)
-app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')))
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads'), {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.mp3') || filePath.endsWith('.webm') || filePath.endsWith('.ogg')) {
+      res.setHeader('Accept-Ranges', 'bytes')
+      res.setHeader('Cache-Control', 'public, max-age=86400')
+    }
+  },
+}))
 
 // ─── API routes ───────────────────────────────────────────────────────────────
 

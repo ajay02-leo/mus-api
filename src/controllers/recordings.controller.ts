@@ -3,31 +3,62 @@ import { prisma } from '../lib/prisma'
 import { AuthRequest } from '../middleware/auth'
 import fs from 'fs'
 import path from 'path'
+import { compressAudio, getAudioDuration } from '../lib/upload'
+import { awardXp } from './gamification.controller'
 
 const BASE_URL = process.env.API_URL ?? 'http://localhost:4000'
 
 export async function uploadRecording(req: AuthRequest, res: Response) {
   if (!req.file) return res.status(400).json({ success: false, message: 'No audio file provided' })
 
-  const { type = 'PRACTICE', raga, duration, notes } = req.body
-  const fileUrl = `${BASE_URL}/uploads/recordings/${req.file.filename}`
+  const { type = 'PRACTICE', raga, title } = req.body
+  const rawUrl = `${BASE_URL}/uploads/recordings/${req.file.filename}`
+  const baseName = path.parse(req.file.filename).name
 
+  // Get duration before responding
+  const filePath = req.file.path
+  const duration = await getAudioDuration(filePath)
+
+  // Create DB record immediately so UI gets a response fast
   const recording = await prisma.recording.create({
     data: {
-      userId: req.user!.userId,
-      url: fileUrl,
-      duration: duration ? Number(duration) : null,
-      type: type as any,
-      raga: raga ?? null,
+      userId:    req.user!.userId,
+      title:     title ?? null,
+      url:       rawUrl,
+      duration,
+      sizeBytes: req.file.size,
+      type:      type as any,
+      raga:      raga ?? null,
     },
   })
 
-  return res.status(201).json({
-    success: true,
-    recording,
-    fileSizeBytes: req.file.size,
-    filename: req.file.filename,
+  // Fire-and-forget compression — don't block the response
+  compressAudio(filePath, baseName).then(async (compressedUrl) => {
+    if (compressedUrl) {
+      await prisma.recording.update({
+        where: { id: recording.id },
+        data: { compressedUrl: `${BASE_URL}${compressedUrl}` },
+      })
+    }
   })
+
+  // Award XP for uploading a practice recording
+  if (type === 'PRACTICE' || type === 'ASSIGNMENT') {
+    awardXp(req.user!.userId, 15, `Recording uploaded: ${title || type}`).catch(() => {})
+  }
+
+  // Update student's lastPracticed + totalPracticeMin if student
+  if (req.user!.role === 'STUDENT' && duration) {
+    await prisma.studentProfile.updateMany({
+      where: { userId: req.user!.userId },
+      data: {
+        lastPracticed: new Date(),
+        totalPracticeMin: { increment: Math.round(duration / 60) },
+      },
+    })
+  }
+
+  return res.status(201).json({ success: true, recording })
 }
 
 export async function listMyRecordings(req: AuthRequest, res: Response) {
@@ -44,7 +75,8 @@ export async function listMyRecordings(req: AuthRequest, res: Response) {
     take: Number(limit),
   })
 
-  return res.json({ success: true, recordings, total: recordings.length })
+  const total = await prisma.recording.count({ where: { userId: req.user!.userId } })
+  return res.json({ success: true, recordings, total })
 }
 
 export async function getRecording(req: AuthRequest, res: Response) {
@@ -63,18 +95,26 @@ export async function deleteRecording(req: AuthRequest, res: Response) {
     return res.status(403).json({ success: false, message: 'Access denied' })
   }
 
-  // Delete file from disk
-  const filename = recording.url.split('/').pop()
-  if (filename) {
-    const filePath = path.join(process.cwd(), 'uploads', 'recordings', filename)
-    if (fs.existsSync(filePath)) fs.unlinkSync(filePath)
+  // Delete raw file from disk
+  const rawFile = recording.url.split('/uploads/recordings/').pop()
+  if (rawFile) {
+    const p = path.join(process.cwd(), 'uploads', 'recordings', rawFile)
+    if (fs.existsSync(p)) fs.unlinkSync(p)
+  }
+
+  // Delete compressed file from disk
+  if (recording.compressedUrl) {
+    const compFile = recording.compressedUrl.split('/uploads/compressed/').pop()
+    if (compFile) {
+      const p = path.join(process.cwd(), 'uploads', 'compressed', compFile)
+      if (fs.existsSync(p)) fs.unlinkSync(p)
+    }
   }
 
   await prisma.recording.delete({ where: { id: req.params.id } })
-  return res.json({ success: true, message: 'Recording deleted' })
+  return res.json({ success: true })
 }
 
-// Teacher views a student's recordings (for grading assignment submissions)
 export async function studentRecordings(req: AuthRequest, res: Response) {
   const recordings = await prisma.recording.findMany({
     where: { userId: req.params.userId },
@@ -84,27 +124,30 @@ export async function studentRecordings(req: AuthRequest, res: Response) {
   return res.json({ success: true, recordings })
 }
 
-// Admin — storage stats
 export async function storageStats(_req: AuthRequest, res: Response) {
   const [total, byType] = await Promise.all([
     prisma.recording.count(),
     prisma.recording.groupBy({ by: ['type'], _count: { id: true } }),
   ])
 
-  const uploadsDir = path.join(process.cwd(), 'uploads', 'recordings')
   let diskBytes = 0
-  if (fs.existsSync(uploadsDir)) {
-    const files = fs.readdirSync(uploadsDir)
-    for (const f of files) {
-      try { diskBytes += fs.statSync(path.join(uploadsDir, f)).size } catch {}
+  for (const dir of ['recordings', 'compressed']) {
+    const d = path.join(process.cwd(), 'uploads', dir)
+    if (fs.existsSync(d)) {
+      for (const f of fs.readdirSync(d)) {
+        try { diskBytes += fs.statSync(path.join(d, f)).size } catch {}
+      }
     }
   }
+
+  const dbTotalBytes = await prisma.recording.aggregate({ _sum: { sizeBytes: true } })
 
   return res.json({
     success: true,
     stats: {
       totalRecordings: total,
       diskUsageMB: (diskBytes / 1024 / 1024).toFixed(2),
+      dbReportedMB: ((dbTotalBytes._sum.sizeBytes ?? 0) / 1024 / 1024).toFixed(2),
       byType: byType.map(r => ({ type: r.type, count: r._count.id })),
     },
   })

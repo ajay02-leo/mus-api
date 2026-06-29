@@ -1,6 +1,7 @@
 import { Response } from 'express'
 import { prisma } from '../lib/prisma'
 import { AuthRequest } from '../middleware/auth'
+import { awardXp } from './gamification.controller'
 
 export async function listAssignments(req: AuthRequest, res: Response) {
   const { userId, role } = req.user!
@@ -75,6 +76,7 @@ export async function submitAssignment(req: AuthRequest, res: Response) {
     create: { assignmentId: req.params.id, studentId: student.id, ...req.body, status: 'SUBMITTED' },
     update: { ...req.body, status: 'SUBMITTED', submittedAt: new Date() },
   })
+  awardXp(req.user!.userId, 25, 'Assignment submitted').catch(() => {})
   return res.json({ success: true, submission })
 }
 
@@ -83,7 +85,11 @@ export async function gradeSubmission(req: AuthRequest, res: Response) {
   const submission = await prisma.assignmentSubmission.update({
     where: { id: submissionId },
     data: { status: 'GRADED', score, feedback, gradedAt: new Date() },
+    include: { student: { select: { userId: true } } },
   })
+  // Bonus XP for high scores
+  const xpBonus = score >= 90 ? 50 : score >= 75 ? 30 : 10
+  awardXp(submission.student.userId, xpBonus, `Assignment graded: ${score}/100`).catch(() => {})
   return res.json({ success: true, submission })
 }
 
